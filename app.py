@@ -24,8 +24,15 @@ DEMO_FILE = Path("tests/fixtures/sample_flex_response.xml")
 
 
 def main() -> None:
-    st.set_page_config(page_title="Portfolio Analyzer", page_icon="\U0001f4ca", layout="wide")
-    st.title("Portfolio Analyzer")
+    st.set_page_config(page_title="IBKR ETF Analyzer", page_icon="\U0001f4ca", layout="wide")
+    analyzer_page = st.Page(_analyzer_page, title="IBKR ETF Analyzer", icon="\U0001f4ca", default=True)
+    guide_page = st.Page("pages/1_Flex_Query_Setup_Guide.py", title="Flex Query Setup Guide", icon="\U0001f4d6")
+    nav = st.navigation([analyzer_page, guide_page])
+    nav.run()
+
+
+def _analyzer_page() -> None:
+    st.title("IBKR ETF Analyzer")
     st.caption("ETF look-through, overlap, fees & concentration analysis")
 
     # --- Sidebar ---
@@ -171,10 +178,10 @@ def _show_positions_table(portfolio: Portfolio) -> None:
     st.dataframe(
         df,
         column_config={
-            "Market Value": st.column_config.NumberColumn(format="$%,.2f"),
-            "Cost Basis": st.column_config.NumberColumn(format="$%,.2f"),
-            "Unrealized P&L": st.column_config.NumberColumn(format="$%,.2f"),
-            "Qty": st.column_config.NumberColumn(format="%,.0f"),
+            "Market Value": st.column_config.NumberColumn(format="dollar"),
+            "Cost Basis": st.column_config.NumberColumn(format="dollar"),
+            "Unrealized P&L": st.column_config.NumberColumn(format="dollar"),
+            "Qty": st.column_config.NumberColumn(format="localized"),
         },
         use_container_width=True,
         hide_index=True,
@@ -194,7 +201,7 @@ def _show_exposures(portfolio: Portfolio, top_n: int) -> None:
                 "#": i,
                 "Stock": exp.symbol,
                 "Total Value": float(exp.total_value),
-                "% Portfolio": exp.weight_of_portfolio,
+                "% Portfolio": exp.weight_of_portfolio * 100,
                 "Direct": float(exp.direct_value) if exp.direct_value else None,
                 "Via ETFs": float(etf_total) if etf_total else None,
                 "ETF Sources": etf_sources or "-",
@@ -204,10 +211,10 @@ def _show_exposures(portfolio: Portfolio, top_n: int) -> None:
     st.dataframe(
         df,
         column_config={
-            "Total Value": st.column_config.NumberColumn(format="$%,.2f"),
-            "% Portfolio": st.column_config.NumberColumn(format="%.2%%"),
-            "Direct": st.column_config.NumberColumn(format="$%,.2f"),
-            "Via ETFs": st.column_config.NumberColumn(format="$%,.2f"),
+            "Total Value": st.column_config.NumberColumn(format="dollar"),
+            "% Portfolio": st.column_config.NumberColumn(format="%.2f%%"),
+            "Direct": st.column_config.NumberColumn(format="dollar"),
+            "Via ETFs": st.column_config.NumberColumn(format="dollar"),
         },
         use_container_width=True,
         hide_index=True,
@@ -233,8 +240,8 @@ def _show_overlap(portfolio: Portfolio) -> None:
                 "ETF B": p.etf_b,
                 "Shared": len(p.shared_holdings),
                 "Overlap Coeff": p.overlap_coefficient,
-                "Overlap in A": p.overlap_weight_a,
-                "Overlap in B": p.overlap_weight_b,
+                "Overlap in A": p.overlap_weight_a * 100,
+                "Overlap in B": p.overlap_weight_b * 100,
                 "Shared Stocks": preview,
             }
         )
@@ -243,8 +250,8 @@ def _show_overlap(portfolio: Portfolio) -> None:
         df,
         column_config={
             "Overlap Coeff": st.column_config.NumberColumn(format="%.2f"),
-            "Overlap in A": st.column_config.NumberColumn(format="%.1%%"),
-            "Overlap in B": st.column_config.NumberColumn(format="%.1%%"),
+            "Overlap in A": st.column_config.NumberColumn(format="%.1f%%"),
+            "Overlap in B": st.column_config.NumberColumn(format="%.1f%%"),
         },
         use_container_width=True,
         hide_index=True,
@@ -277,7 +284,7 @@ def _show_fees(portfolio: Portfolio, config) -> None:
         column_config={
             "ER": st.column_config.NumberColumn(format="%.4f"),
             "Alt ER": st.column_config.NumberColumn(format="%.4f"),
-            "Est. Annual Savings": st.column_config.NumberColumn(format="$%,.2f"),
+            "Est. Annual Savings": st.column_config.NumberColumn(format="dollar"),
         },
         use_container_width=True,
         hide_index=True,
@@ -316,15 +323,15 @@ def _show_concentration(portfolio: Portfolio, config) -> None:
     total_value = float(portfolio.total_value) or 1.0
     rows = []
     for sector, value in sector_pcts.items():
-        pct = value / total_value
+        pct = value / total_value * 100
         rows.append({"Sector": sector, "Value": value, "Weight": pct})
 
     df = pd.DataFrame(rows)
     st.dataframe(
         df,
         column_config={
-            "Value": st.column_config.NumberColumn(format="$%,.0f"),
-            "Weight": st.column_config.NumberColumn(format="%.1%%"),
+            "Value": st.column_config.NumberColumn(format="dollar"),
+            "Weight": st.column_config.NumberColumn(format="%.1f%%"),
         },
         use_container_width=True,
         hide_index=True,
