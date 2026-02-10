@@ -1,0 +1,6 @@
+streamlit>=1.30
+ibflex>=0.15
+yfinance>=0.2.30
+pandas>=2.0
+pyyaml>=6.0
+python-dotenv>=1.0

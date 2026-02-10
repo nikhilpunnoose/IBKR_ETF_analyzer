@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="Positions" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1234567" fromDate="2026-02-01" toDate="2026-02-07" period="Last7CalendarDays" whenGenerated="2026-02-08;12:00:00">
+      <OpenPositions>
+        <OpenPosition
+          symbol="VTI"
+          description="VANGUARD TOTAL STOCK MKT ETF"
+          assetCategory="STK"
+          isin="US9229087690"
+          position="100"
+          markPrice="280.50"
+          positionValue="28050.00"
+          costBasisMoney="25000.00"
+          currency="USD"
+          fifoPnlUnrealized="3050.00"
+          reportDate="2026-02-07"
+        />
+        <OpenPosition
+          symbol="VXUS"
+          description="VANGUARD TOTAL INTL STOCK ETF"
+          assetCategory="STK"
+          isin="US9219097683"
+          position="200"
+          markPrice="60.25"
+          positionValue="12050.00"
+          costBasisMoney="11000.00"
+          currency="USD"
+          fifoPnlUnrealized="1050.00"
+          reportDate="2026-02-07"
+        />
+        <OpenPosition
+          symbol="VOO"
+          description="VANGUARD S&amp;P 500 ETF"
+          assetCategory="STK"
+          isin="US9229083632"
+          position="50"
+          markPrice="510.00"
+          positionValue="25500.00"
+          costBasisMoney="22000.00"
+          currency="USD"
+          fifoPnlUnrealized="3500.00"
+          reportDate="2026-02-07"
+        />
+        <OpenPosition
+          symbol="AAPL"
+          description="APPLE INC"
+          assetCategory="STK"
+          isin="US0378331005"
+          position="30"
+          markPrice="185.00"
+          positionValue="5550.00"
+          costBasisMoney="4500.00"
+          currency="USD"
+          fifoPnlUnrealized="1050.00"
+          reportDate="2026-02-07"
+        />
+        <OpenPosition
+          symbol="BND"
+          description="VANGUARD TOTAL BOND MKT ETF"
+          assetCategory="STK"
+          isin="US9219378356"
+          position="150"
+          markPrice="72.00"
+          positionValue="10800.00"
+          costBasisMoney="11200.00"
+          currency="USD"
+          fifoPnlUnrealized="-400.00"
+          reportDate="2026-02-07"
+        />
+      </OpenPositions>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>

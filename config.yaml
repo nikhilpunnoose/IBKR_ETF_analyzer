@@ -1,0 +1,38 @@
+cache:
+  directory: ~/.portfolio_analyzer/cache
+  etf_holdings_ttl_days: 7
+
+# Override expense ratios when yfinance returns bad data.
+# Use the IBKR ticker (not the yfinance suffix version).
+expense_ratio_overrides:
+  VWCE: 0.0022
+
+analysis:
+  concentration_thresholds:
+    single_stock_warn: 0.05
+    sector_warn: 0.30
+    top10_warn: 0.40
+
+  fee_alternatives:
+    "Large Blend":
+      - { symbol: "VTI", name: "Vanguard Total Stock Market", expense_ratio: 0.0003 }
+      - { symbol: "SCHB", name: "Schwab US Broad Market", expense_ratio: 0.0003 }
+      - { symbol: "ITOT", name: "iShares Core S&P Total US", expense_ratio: 0.0003 }
+    "Large Growth":
+      - { symbol: "VUG", name: "Vanguard Growth", expense_ratio: 0.0004 }
+      - { symbol: "SCHG", name: "Schwab US Large-Cap Growth", expense_ratio: 0.0004 }
+    "Large Value":
+      - { symbol: "VTV", name: "Vanguard Value", expense_ratio: 0.0004 }
+      - { symbol: "SCHV", name: "Schwab US Large-Cap Value", expense_ratio: 0.0004 }
+    "Foreign Large Blend":
+      - { symbol: "VXUS", name: "Vanguard Total International", expense_ratio: 0.0005 }
+      - { symbol: "IXUS", name: "iShares Core MSCI Total Intl", expense_ratio: 0.0007 }
+    "Diversified Emerging Mkts":
+      - { symbol: "VWO", name: "Vanguard FTSE Emerging Markets", expense_ratio: 0.0008 }
+      - { symbol: "IEMG", name: "iShares Core MSCI Emerging Markets", expense_ratio: 0.0009 }
+    "Intermediate-Term Bond":
+      - { symbol: "BND", name: "Vanguard Total Bond Market", expense_ratio: 0.0003 }
+      - { symbol: "AGG", name: "iShares Core US Aggregate Bond", expense_ratio: 0.0003 }
+    "Technology":
+      - { symbol: "VGT", name: "Vanguard Information Technology", expense_ratio: 0.0010 }
+      - { symbol: "XLK", name: "SPDR Technology Select Sector", expense_ratio: 0.0009 }

@@ -1,0 +1,23 @@
+[project]
+name = "portfolio-analyzer"
+version = "0.1.0"
+description = "Analyze IBKR portfolio: ETF look-through, overlap, fees, concentration"
+requires-python = ">=3.10"
+dependencies = [
+    "ibflex>=0.15",
+    "yfinance>=0.2.30",
+    "rich>=13.0",
+    "pandas>=2.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+portfolio-analyzer = "portfolio_analyzer.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
