@@ -1,10 +1,10 @@
 #!/bin/bash
 # Setup script for portfolio_analyzer
-# Re-run this after a WSL restart if /tmp/pa_venv is gone
+# Venv lives on the Linux filesystem (not NTFS) to avoid permission issues.
 
 set -e
 
-VENV_DIR="/tmp/pa_venv"
+VENV_DIR="$HOME/.local/share/pa_venv"
 
 if [ -d "$VENV_DIR" ]; then
     echo "Virtual environment already exists at $VENV_DIR"

@@ -13,11 +13,23 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from auth import (
+    auth_available,
+    get_login_url,
+    get_user,
+    get_user_id,
+    handle_oauth_callback,
+    has_ibkr_credentials,
+    is_authenticated,
+    load_ibkr_credentials,
+    logout,
+    restore_session,
+)
 from portfolio_analyzer.analysis import concentration, fees, lookthrough, overlap
 from portfolio_analyzer.cache.store import CacheStore
 from portfolio_analyzer.config import load_config
 from portfolio_analyzer.fetcher.etf_holdings import fetch_all_etf_info, identify_etfs
-from portfolio_analyzer.fetcher.ibkr import load_from_file, parse_xml_bytes
+from portfolio_analyzer.fetcher.ibkr import fetch_positions, load_from_file, parse_xml_bytes
 from portfolio_analyzer.models import AssetType, Portfolio
 
 DEMO_FILE = Path("tests/fixtures/sample_flex_response.xml")
@@ -25,9 +37,38 @@ DEMO_FILE = Path("tests/fixtures/sample_flex_response.xml")
 
 def main() -> None:
     st.set_page_config(page_title="IBKR ETF Analyzer", page_icon="\U0001f4ca", layout="wide")
-    analyzer_page = st.Page(_analyzer_page, title="IBKR ETF Analyzer", icon="\U0001f4ca", default=True)
-    guide_page = st.Page("pages/1_Flex_Query_Setup_Guide.py", title="Flex Query Setup Guide", icon="\U0001f4d6")
-    nav = st.navigation([analyzer_page, guide_page])
+
+    # Handle OAuth callback before anything else
+    use_auth = auth_available()
+    if use_auth:
+        if handle_oauth_callback():
+            st.rerun()
+        restore_session()
+
+    # Build page list
+    pages = [
+        st.Page(_analyzer_page, title="IBKR ETF Analyzer", icon="\U0001f4ca", default=True),
+        st.Page("pages/1_Flex_Query_Setup_Guide.py", title="Flex Query Setup Guide", icon="\U0001f4d6"),
+    ]
+    if use_auth and is_authenticated():
+        pages.append(
+            st.Page("pages/2_Account_Settings.py", title="Account Settings", icon="\u2699\ufe0f")
+        )
+
+    # Auth UI in sidebar (only if Supabase is configured)
+    if use_auth:
+        with st.sidebar:
+            if is_authenticated():
+                user = get_user()
+                st.caption(f"Signed in as {user.email}")
+                if st.button("Sign Out"):
+                    logout()
+                    st.rerun()
+            else:
+                login_url = get_login_url()
+                st.link_button("Sign in with Google", login_url)
+
+    nav = st.navigation(pages)
     nav.run()
 
 
@@ -38,12 +79,38 @@ def _analyzer_page() -> None:
     # --- Sidebar ---
     with st.sidebar:
         st.header("Data Source")
-        mode = st.radio("Choose input", ["Upload Flex Query XML", "Try Demo"], label_visibility="collapsed")
+
+        # Build radio options dynamically
+        options = []
+        use_auth = auth_available()
+        authenticated = use_auth and is_authenticated()
+        user_id = get_user_id() if authenticated else None
+        show_ibkr_option = authenticated and user_id and has_ibkr_credentials(user_id)
+        if show_ibkr_option:
+            options.append("Load from IBKR")
+        options.extend(["Upload Flex Query XML", "Try Demo"])
+
+        mode = st.radio("Choose input", options, label_visibility="collapsed")
 
         uploaded_file = None
         if mode == "Upload Flex Query XML":
             uploaded_file = st.file_uploader("Upload your IBKR Flex Query XML", type=["xml"])
-            st.info("Your data is processed in-memory and never stored on the server.", icon="\U0001f512")
+            if authenticated:
+                st.info(
+                    "Your XML is processed in-memory. If you save IBKR credentials, "
+                    "only the Flex Query token (encrypted) and query ID are stored.",
+                    icon="\U0001f512",
+                )
+            else:
+                st.info(
+                    "Your data is processed in-memory and never stored on the server.",
+                    icon="\U0001f512",
+                )
+        elif mode == "Load from IBKR":
+            if st.button("Refresh from IBKR"):
+                # Clear cached data to force re-fetch
+                st.session_state.pop("data_key", None)
+                st.rerun()
 
         st.divider()
         st.header("Analysis Options")
@@ -57,8 +124,23 @@ def _analyzer_page() -> None:
     # --- Determine data source ---
     raw_xml: bytes | None = None
     data_key: str | None = None
+    prefetched_positions = None
 
-    if mode == "Upload Flex Query XML":
+    if mode == "Load from IBKR":
+        data_key = f"ibkr_live_{user_id}"
+        if st.session_state.get("data_key") != data_key:
+            creds = load_ibkr_credentials(user_id)
+            if not creds:
+                st.error("Could not load saved credentials. Please update them in Account Settings.")
+                return
+            token, query_id = creds
+            with st.spinner("Fetching positions from IBKR (this may take 10-30 seconds)..."):
+                try:
+                    prefetched_positions = fetch_positions(token, query_id)
+                except Exception as e:
+                    st.error(f"Failed to fetch from IBKR: {e}")
+                    return
+    elif mode == "Upload Flex Query XML":
         if uploaded_file is None:
             st.info("Upload a Flex Query XML file in the sidebar to get started.")
             return
@@ -72,7 +154,7 @@ def _analyzer_page() -> None:
 
     # --- Pipeline (cached in session state) ---
     if st.session_state.get("data_key") != data_key:
-        _run_pipeline(raw_xml, data_key)
+        _run_pipeline(raw_xml, data_key, prefetched_positions=prefetched_positions)
 
     portfolio: Portfolio = st.session_state["portfolio"]
     config = st.session_state["config"]
@@ -94,14 +176,21 @@ def _analyzer_page() -> None:
         _show_concentration(portfolio, config)
 
 
-def _run_pipeline(raw_xml: bytes | None, data_key: str) -> None:
+def _run_pipeline(
+    raw_xml: bytes | None,
+    data_key: str,
+    *,
+    prefetched_positions: list | None = None,
+) -> None:
     """Execute the full analysis pipeline and cache results in session state."""
     config = load_config()
     cache = CacheStore(config.cache.directory / "etf_cache.db", config.cache.etf_holdings_ttl_days)
 
     try:
         # Step 1: Parse positions
-        if raw_xml is not None:
+        if prefetched_positions is not None:
+            positions = prefetched_positions
+        elif raw_xml is not None:
             positions = parse_xml_bytes(raw_xml)
         else:
             positions = load_from_file(DEMO_FILE)

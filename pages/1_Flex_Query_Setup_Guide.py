@@ -143,6 +143,8 @@ st.markdown("""
 - Your session data is discarded when you close the browser tab
 - The only external calls made are to **Yahoo Finance** to fetch public ETF data (holdings,
   expense ratios, sectors)
+- If you sign in and save your IBKR Flex Query credentials, the token is **encrypted** (Fernet)
+  before storage and can be **deleted anytime** from Account Settings
 """)
 
 # --- Troubleshooting ---
