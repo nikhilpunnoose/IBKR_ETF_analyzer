@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:www.interactivebrokers.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.ibkrguides.com)",
+      "WebFetch(domain:pypi.org)",
+      "Bash(python3 -m venv:*)",
+      "Bash(. .venv/bin/activate)",
+      "Bash(pip install:*)",
+      "Bash(.:*)",
+      "Bash(PYTHONPATH=/mnt/c/Users/nikhi/portfolio_analyzer python3:*)",
+      "Bash(echo:*)",
+      "WebFetch(domain:docs.streamlit.io)",
+      "Bash(curl:*)",
+      "WebFetch(domain:docs.antsignals.com)",
+      "WebFetch(domain:help.blockpit.io)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:fxnewsgroup.com)",
+      "WebFetch(domain:www.pocketportfolio.app)",
+      "WebFetch(domain:trade.report)",
+      "Bash(PYTHONPATH=. python -m pytest:*)",
+      "Bash(where:*)",
+      "Bash(pip:*)",
+      "Bash(python -m pip install:*)",
+      "Bash(python:*)",
+      "Bash(PYTHONPATH=. python:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(taskkill:*)",
+      "Bash(tasklist)",
+      "Bash(netstat:*)",
+      "Bash(C:Python311python.exe -m pip install streamlit openpyxl ibflex yfinance pyyaml python-dotenv rich pandas)",
+      "Bash(python3:*)",
+      "Bash(wsl.exe -e bash -c:*)",
+      "Bash(sqlite3:*)",
+      "Bash(wslpath:*)",
+      "Bash(wsl --list:*)",
+      "Bash(wsl -e ls:*)",
+      "Bash(wsl:*)"
+    ]
+  }
+}

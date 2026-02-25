@@ -20,6 +20,17 @@ def _resolve_yf_symbol(symbol: str) -> tuple[str, str | None]:
     Returns (original_symbol, yfinance_symbol) where yfinance_symbol is the
     one that worked, or None if nothing matched as an ETF.
     """
+    # If the plain symbol is already a stock/equity, skip suffix hunting.
+    # This prevents ghost exchange listings (e.g. AAPL.L) from causing false
+    # positives when yfinance incorrectly tags them as ETF.
+    try:
+        ticker = yf.Ticker(symbol)
+        qt = (ticker.fast_info.get("quoteType", "") or "").upper()
+        if qt in ("EQUITY", "STOCK"):
+            return symbol, None
+    except Exception:
+        pass
+
     for suffix in _EXCHANGE_SUFFIXES:
         yf_sym = symbol + suffix
         try:
