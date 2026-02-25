@@ -67,6 +67,7 @@ def _parse_xml(raw_xml: bytes) -> list[Position]:
                         attrs.get("fifoPnlUnrealized") or attrs.get("unrealizedPnl")
                     ),
                     report_date=_parse_date(attrs.get("reportDate", "")) or stmt_date,
+                    source="ibkr",
                 )
             )
 

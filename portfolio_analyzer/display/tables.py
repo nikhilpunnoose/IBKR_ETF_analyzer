@@ -8,6 +8,7 @@ from rich.table import Table
 from rich.text import Text
 
 from portfolio_analyzer.models import (
+    AssetClassBreakdown,
     ConcentrationAlert,
     EffectiveExposure,
     FeeAlternative,
@@ -34,8 +35,14 @@ def show_portfolio_summary(portfolio: Portfolio, total_fees: Decimal) -> None:
 
 
 def show_positions(positions: list[Position]) -> None:
+    # Show Source column only when multiple sources are present
+    sources = set(p.source for p in positions)
+    multi_source = len(sources) > 1
+
     table = Table(title="Current Positions", title_style="bold cyan")
     table.add_column("Symbol", style="cyan")
+    if multi_source:
+        table.add_column("Source")
     table.add_column("Type")
     table.add_column("Qty", justify="right")
     table.add_column("Mkt Value", justify="right", style="green")
@@ -45,15 +52,18 @@ def show_positions(positions: list[Position]) -> None:
 
     for p in sorted(positions, key=lambda x: x.market_value, reverse=True):
         pnl_style = "green" if p.unrealized_pnl >= 0 else "red"
-        table.add_row(
-            p.symbol,
+        row = [p.symbol]
+        if multi_source:
+            row.append(p.source.upper())
+        row.extend([
             p.asset_type.value,
             f"{p.quantity:,.0f}",
             f"${p.market_value:,.2f}",
             f"${p.cost_basis:,.2f}",
             Text(f"${p.unrealized_pnl:,.2f}", style=pnl_style),
             p.currency,
-        )
+        ])
+        table.add_row(*row)
     console.print()
     console.print(table)
 
@@ -171,3 +181,50 @@ def show_sector_breakdown(sector_pcts: dict[str, float], total_value: float) -> 
         table.add_row(sector, f"${value:,.0f}", f"{pct:.1%}", f"[cyan]{bar}[/cyan]")
     console.print()
     console.print(table)
+
+
+def show_asset_class_breakdown(breakdown: AssetClassBreakdown) -> None:
+    """Display asset class breakdown (equities vs fixed income vs other)."""
+    table = Table(title="Asset Class Breakdown", title_style="bold cyan")
+    table.add_column("Asset Class")
+    table.add_column("Value", justify="right", style="green")
+    table.add_column("Weight", justify="right")
+    table.add_column("", min_width=30)
+
+    for label, value, weight in [
+        ("Equities", breakdown.equities_value, breakdown.equities_weight),
+        ("Fixed Income", breakdown.fixed_income_value, breakdown.fixed_income_weight),
+        ("Other", breakdown.other_value, breakdown.other_weight),
+    ]:
+        if value == 0:
+            continue
+        bar_len = int(weight * 50)
+        bar = "=" * bar_len
+        table.add_row(label, f"${value:,.2f}", f"{weight:.1%}", f"[cyan]{bar}[/cyan]")
+
+    console.print()
+    console.print(table)
+
+    # Detail table: how each position contributes
+    if breakdown.details:
+        detail_table = Table(title="Asset Class Detail by Position", title_style="bold cyan")
+        detail_table.add_column("Symbol", style="cyan")
+        detail_table.add_column("Source")
+        detail_table.add_column("Type")
+        detail_table.add_column("Mkt Value", justify="right")
+        detail_table.add_column("Equities", justify="right", style="green")
+        detail_table.add_column("Fixed Income", justify="right", style="blue")
+        detail_table.add_column("Other", justify="right", style="dim")
+
+        for d in sorted(breakdown.details, key=lambda x: x.market_value, reverse=True):
+            detail_table.add_row(
+                d.symbol,
+                d.source.upper(),
+                d.asset_type,
+                f"${d.market_value:,.2f}",
+                f"${d.equities_portion:,.2f}" if d.equities_portion else "-",
+                f"${d.fixed_income_portion:,.2f}" if d.fixed_income_portion else "-",
+                f"${d.other_portion:,.2f}" if d.other_portion else "-",
+            )
+        console.print()
+        console.print(detail_table)

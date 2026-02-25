@@ -29,11 +29,19 @@ class AnalysisConfig:
 
 
 @dataclass
+class CurrencyConfig:
+    base: str = "USD"
+    rates: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
 class AppConfig:
     ibkr: IBKRConfig | None
     cache: CacheConfig
     analysis: AnalysisConfig
     expense_ratio_overrides: dict[str, float] = field(default_factory=dict)
+    currency: CurrencyConfig = field(default_factory=CurrencyConfig)
+    asset_class_overrides: dict[str, str] = field(default_factory=dict)
 
 
 def load_config(config_path: str = "config.yaml", env_path: str = ".env") -> AppConfig:
@@ -56,6 +64,15 @@ def load_config(config_path: str = "config.yaml", env_path: str = ".env") -> App
     er_overrides_raw = cfg.get("expense_ratio_overrides", {}) or {}
     er_overrides = {k: float(v) for k, v in er_overrides_raw.items()}
 
+    currency_cfg = cfg.get("currency", {})
+    currency = CurrencyConfig(
+        base=currency_cfg.get("base", "USD"),
+        rates={k: float(v) for k, v in currency_cfg.get("rates", {}).items()},
+    )
+
+    ac_overrides_raw = cfg.get("asset_class_overrides", {}) or {}
+    ac_overrides = {k: str(v) for k, v in ac_overrides_raw.items()}
+
     return AppConfig(
         ibkr=ibkr,
         cache=CacheConfig(
@@ -69,4 +86,6 @@ def load_config(config_path: str = "config.yaml", env_path: str = ".env") -> App
             fee_alternatives=analysis_cfg.get("fee_alternatives", {}),
         ),
         expense_ratio_overrides=er_overrides,
+        currency=currency,
+        asset_class_overrides=ac_overrides,
     )

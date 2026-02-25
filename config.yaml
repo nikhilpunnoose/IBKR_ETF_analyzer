@@ -7,6 +7,23 @@ cache:
 expense_ratio_overrides:
   VWCE: 0.0022
 
+# Currency conversion rates to base currency (USD).
+# AED is pegged to USD at ~3.6725 AED per USD.
+currency:
+  base: USD
+  rates:
+    AED: 0.2723   # 1 AED = 0.2723 USD (pegged)
+    EUR: 1.05     # approximate — update as needed
+    GBP: 1.27     # approximate — update as needed
+    CHF: 1.13     # approximate — update as needed
+    CAD: 0.72     # approximate — update as needed
+    AUD: 0.63     # approximate — update as needed
+    SGD: 0.75     # approximate — update as needed
+
+# Override asset class classification for specific symbols.
+# Values: "equities" or "fixed_income"
+asset_class_overrides: {}
+
 analysis:
   concentration_thresholds:
     single_stock_warn: 0.05

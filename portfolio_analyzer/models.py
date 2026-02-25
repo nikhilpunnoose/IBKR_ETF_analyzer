@@ -12,12 +12,22 @@ class AssetType(Enum):
     BOND = "bond"
     OPTION = "option"
     CASH = "cash"
+    MUTUAL_FUND = "mutual_fund"
+    SUKUK = "sukuk"
+    RSU = "rsu"
+    CRYPTO = "crypto"
+    OTHER = "other"
+
+
+class AssetClassBucket(Enum):
+    EQUITIES = "equities"
+    FIXED_INCOME = "fixed_income"
     OTHER = "other"
 
 
 @dataclass
 class Position:
-    """A single position from IBKR."""
+    """A single position in the portfolio."""
 
     symbol: str
     isin: str | None
@@ -30,6 +40,8 @@ class Position:
     mark_price: Decimal
     unrealized_pnl: Decimal
     report_date: date
+    source: str = "ibkr"
+    sector: str = ""  # optional manual sector tag for concentration analysis
 
 
 @dataclass
@@ -112,3 +124,49 @@ class Portfolio:
     etf_info: dict[str, ETFInfo]
     total_value: Decimal
     report_date: date | None
+
+
+@dataclass
+class AssetClassDetail:
+    """How a single position contributes to asset class buckets."""
+
+    symbol: str
+    source: str
+    asset_type: str
+    market_value: Decimal
+    equities_portion: Decimal
+    fixed_income_portion: Decimal
+    other_portion: Decimal
+
+
+@dataclass
+class AssetClassBreakdown:
+    """Breakdown of portfolio into equities vs fixed income."""
+
+    equities_value: Decimal
+    equities_weight: float
+    fixed_income_value: Decimal
+    fixed_income_weight: float
+    other_value: Decimal
+    other_weight: float
+    details: list[AssetClassDetail] = field(default_factory=list)
+
+
+@dataclass
+class ManualPosition:
+    """A manually entered position for ENBD or EquatePlus."""
+
+    id: str
+    source: str  # "enbd" or "equateplus"
+    symbol: str
+    description: str
+    asset_type: str  # AssetType value
+    quantity: str  # stored as string, converted to Decimal
+    market_value: str
+    cost_basis: str
+    currency: str
+    mark_price: str
+    notes: str = ""
+    unvested_quantity: str = "0"
+    updated_at: str = ""
+    sector: str = ""  # optional sector tag surfaced in concentration analysis

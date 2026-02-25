@@ -7,11 +7,14 @@ import sys
 from rich.console import Console
 
 from portfolio_analyzer.analysis import concentration, fees, lookthrough, overlap
+from portfolio_analyzer.analysis import asset_class
 from portfolio_analyzer.cache.store import CacheStore
 from portfolio_analyzer.config import load_config
 from portfolio_analyzer.display import tables
+from portfolio_analyzer.fetcher.consolidate import build_consolidated_portfolio
 from portfolio_analyzer.fetcher.etf_holdings import fetch_all_etf_info, identify_etfs
 from portfolio_analyzer.fetcher.ibkr import fetch_positions, load_from_file
+from portfolio_analyzer.fetcher.manual import load_manual_positions
 from portfolio_analyzer.models import AssetType, Portfolio
 
 console = Console()
@@ -21,9 +24,11 @@ logger = logging.getLogger(__name__)
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="portfolio_analyzer",
-        description="Analyze your IBKR portfolio: ETF look-through, overlap, fees, concentration",
+        description="Analyze your portfolio: ETF look-through, overlap, fees, concentration, asset classes",
     )
-    parser.add_argument("--from-file", type=str, default=None, help="Load positions from a Flex XML file")
+    parser.add_argument("--from-file", type=str, default=None, help="Load IBKR positions from a Flex XML file")
+    parser.add_argument("--etoro-file", type=str, default=None, help="Load positions from an eToro XLS/XLSX export")
+    parser.add_argument("--include-manual", action="store_true", help="Include manually entered positions (ENBD, EquatePlus)")
     parser.add_argument("--config", type=str, default="config.yaml", help="Path to config.yaml")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
 
@@ -36,6 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     report_p.add_argument("--fees", action="store_true", help="Show fee analysis only")
     report_p.add_argument("--exposure", action="store_true", help="Show look-through exposure only")
     report_p.add_argument("--concentration", action="store_true", help="Show concentration only")
+    report_p.add_argument("--asset-class", action="store_true", help="Show asset class breakdown")
     report_p.add_argument("--top", type=int, default=20, help="Number of top exposures to show")
 
     cache_p = sub.add_parser("cache", help="Cache management")
@@ -63,11 +69,15 @@ def main(argv: list[str] | None = None) -> None:
                 console.print("[green]Cache cleared.[/green]")
             return
 
-        # Step 1: Get positions
-        positions = _load_positions(args, config)
+        # Step 1: Get positions from all sources
+        positions = _load_all_positions(args, config)
         if not positions:
             console.print("[red]No positions found.[/red]")
             return
+
+        sources = set(p.source for p in positions)
+        if len(sources) > 1:
+            console.print(f"Sources: {', '.join(s.upper() for s in sorted(sources))}")
 
         if args.command == "fetch":
             tables.show_positions(positions)
@@ -94,12 +104,15 @@ def main(argv: list[str] | None = None) -> None:
             if sym in etf_info:
                 etf_info[sym].expense_ratio = er
 
-        # Step 4: Build portfolio
-        total_value = sum(p.market_value for p in positions)
-        portfolio = Portfolio(
-            positions=positions,
+        # Step 4: Build consolidated portfolio
+        sources_dict = {}
+        for p in positions:
+            sources_dict.setdefault(p.source, []).append(p)
+        portfolio = build_consolidated_portfolio(
+            sources=sources_dict,
             etf_info=etf_info,
-            total_value=total_value,
+            currency_rates=config.currency.rates,
+            base_currency=config.currency.base,
             report_date=positions[0].report_date if positions else None,
         )
 
@@ -110,18 +123,37 @@ def main(argv: list[str] | None = None) -> None:
         cache.close()
 
 
-def _load_positions(args: argparse.Namespace, config) -> list:
-    if args.from_file:
-        console.print(f"Loading positions from [cyan]{args.from_file}[/cyan]")
-        return load_from_file(args.from_file)
+def _load_all_positions(args: argparse.Namespace, config) -> list:
+    positions = []
 
-    if config.ibkr is None:
-        console.print("[red]No IBKR credentials configured. Set IBKR_FLEX_TOKEN and IBKR_QUERY_ID in .env[/red]")
-        console.print("[dim]Or use --from-file to load from a saved XML file.[/dim]")
+    # IBKR source
+    if args.from_file:
+        console.print(f"Loading IBKR positions from [cyan]{args.from_file}[/cyan]")
+        positions.extend(load_from_file(args.from_file))
+    elif config.ibkr:
+        with console.status("Fetching positions from IBKR..."):
+            positions.extend(fetch_positions(config.ibkr.flex_token, config.ibkr.query_id))
+
+    # eToro source
+    if args.etoro_file:
+        console.print(f"Loading eToro positions from [cyan]{args.etoro_file}[/cyan]")
+        from portfolio_analyzer.fetcher.etoro import parse_etoro_file
+        positions.extend(parse_etoro_file(args.etoro_file))
+
+    # Manual positions (ENBD + EquatePlus)
+    if args.include_manual:
+        for source in ("enbd", "equateplus"):
+            manual = load_manual_positions(user_id=None, source=source)
+            if manual:
+                console.print(f"Loaded {len(manual)} manual positions from [cyan]{source.upper()}[/cyan]")
+                positions.extend(manual)
+
+    if not positions and not args.from_file and config.ibkr is None:
+        console.print("[red]No data sources configured.[/red]")
+        console.print("[dim]Use --from-file, --etoro-file, or --include-manual.[/dim]")
         sys.exit(1)
 
-    with console.status("Fetching positions from IBKR..."):
-        return fetch_positions(config.ibkr.flex_token, config.ibkr.query_id)
+    return positions
 
 
 def _run_report(args: argparse.Namespace, portfolio: Portfolio, config) -> None:
@@ -129,12 +161,20 @@ def _run_report(args: argparse.Namespace, portfolio: Portfolio, config) -> None:
     tables.show_portfolio_summary(portfolio, total_annual_fees)
     tables.show_positions(portfolio.positions)
 
-    effective = lookthrough.compute_effective_exposures(portfolio)
+    effective = lookthrough.compute_effective_exposures(
+        portfolio,
+        currency_rates=config.currency.rates,
+        base_currency=config.currency.base,
+    )
 
     report_args = args if args.command == "report" else argparse.Namespace(
-        overlap=False, fees=False, exposure=False, concentration=False, top=20
+        overlap=False, fees=False, exposure=False, concentration=False,
+        asset_class=False, top=20,
     )
-    show_all = not any([report_args.overlap, report_args.fees, report_args.exposure, report_args.concentration])
+    show_all = not any([
+        report_args.overlap, report_args.fees, report_args.exposure,
+        report_args.concentration, report_args.asset_class,
+    ])
     top_n = report_args.top
 
     if show_all or report_args.exposure:
@@ -155,7 +195,22 @@ def _run_report(args: argparse.Namespace, portfolio: Portfolio, config) -> None:
             single_stock_warn=config.analysis.single_stock_warn,
             sector_warn=config.analysis.sector_warn,
             top10_warn=config.analysis.top10_warn,
+            currency_rates=config.currency.rates,
+            base_currency=config.currency.base,
         )
         tables.show_concentration_alerts(alerts)
-        sector_pcts = concentration.compute_sector_breakdown(portfolio)
+        sector_pcts = concentration.compute_sector_breakdown(
+            portfolio,
+            currency_rates=config.currency.rates,
+            base_currency=config.currency.base,
+        )
         tables.show_sector_breakdown(sector_pcts, float(portfolio.total_value))
+
+    if show_all or report_args.asset_class:
+        breakdown = asset_class.compute_asset_class_breakdown(
+            portfolio,
+            overrides=config.asset_class_overrides,
+            currency_rates=config.currency.rates,
+            base_currency=config.currency.base,
+        )
+        tables.show_asset_class_breakdown(breakdown)

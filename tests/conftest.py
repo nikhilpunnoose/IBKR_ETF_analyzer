@@ -12,7 +12,10 @@ from portfolio_analyzer.models import (
 )
 
 
-def _make_position(symbol, asset_type, market_value, cost_basis=None, description=""):
+def _make_position(
+    symbol, asset_type, market_value, cost_basis=None, description="",
+    source="ibkr", currency="USD",
+):
     return Position(
         symbol=symbol,
         isin=None,
@@ -21,10 +24,11 @@ def _make_position(symbol, asset_type, market_value, cost_basis=None, descriptio
         quantity=Decimal(1),
         market_value=Decimal(str(market_value)),
         cost_basis=Decimal(str(cost_basis or market_value)),
-        currency="USD",
+        currency=currency,
         mark_price=Decimal(str(market_value)),
         unrealized_pnl=Decimal(str(market_value - (cost_basis or market_value))),
         report_date=date(2026, 2, 7),
+        source=source,
     )
 
 

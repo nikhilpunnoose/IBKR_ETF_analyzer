@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from portfolio_analyzer.models import ConcentrationAlert, EffectiveExposure, Portfolio
 
 
@@ -9,10 +11,22 @@ def analyze_concentration(
     single_stock_warn: float = 0.05,
     sector_warn: float = 0.30,
     top10_warn: float = 0.40,
+    currency_rates: dict[str, float] | None = None,
+    base_currency: str = "USD",
 ) -> list[ConcentrationAlert]:
     """Check for single-stock, sector, and top-10 concentration risks."""
     alerts: list[ConcentrationAlert] = []
     total = float(portfolio.total_value) if portfolio.total_value else 1.0
+
+    rates = currency_rates or {}
+
+    def _convert(value: float, currency: str) -> float:
+        if currency == base_currency or not rates:
+            return value
+        rate = rates.get(currency)
+        if rate is None:
+            return value  # best-effort: skip conversion rather than crash
+        return value * rate
 
     # Single-stock concentration
     for exp in effective_exposures:
@@ -38,12 +52,20 @@ def analyze_concentration(
 
     # Sector concentration
     sector_totals: dict[str, float] = {}
+
+    # ETF-derived sector weights (with currency conversion)
     for pos in portfolio.positions:
         if pos.symbol in portfolio.etf_info:
             etf = portfolio.etf_info[pos.symbol]
-            pos_value = float(pos.market_value)
+            pos_value = _convert(float(pos.market_value), pos.currency)
             for sector, weight in etf.sector_weights.items():
                 sector_totals[sector] = sector_totals.get(sector, 0.0) + pos_value * weight
+
+    # Direct position sector tags (pos.sector)
+    for pos in portfolio.positions:
+        if pos.sector:
+            pos_value = _convert(float(pos.market_value), pos.currency)
+            sector_totals[pos.sector] = sector_totals.get(pos.sector, 0.0) + pos_value
 
     for sector, value in sector_totals.items():
         weight = value / total if total > 0 else 0.0
@@ -76,13 +98,36 @@ def analyze_concentration(
     return alerts
 
 
-def compute_sector_breakdown(portfolio: Portfolio) -> dict[str, float]:
-    """Return sector -> portfolio percentage."""
-    total = float(portfolio.total_value) or 1.0
+def compute_sector_breakdown(
+    portfolio: Portfolio,
+    currency_rates: dict[str, float] | None = None,
+    base_currency: str = "USD",
+) -> dict[str, float]:
+    """Return sector -> portfolio value (in base currency)."""
+    rates = currency_rates or {}
+
+    def _convert(value: float, currency: str) -> float:
+        if currency == base_currency or not rates:
+            return value
+        rate = rates.get(currency)
+        if rate is None:
+            return value  # best-effort: skip conversion rather than crash
+        return value * rate
+
     sector_values: dict[str, float] = {}
+
+    # ETF-derived sector weights (with currency conversion)
     for pos in portfolio.positions:
         if pos.symbol in portfolio.etf_info:
             etf = portfolio.etf_info[pos.symbol]
+            pos_value = _convert(float(pos.market_value), pos.currency)
             for sector, weight in etf.sector_weights.items():
-                sector_values[sector] = sector_values.get(sector, 0.0) + float(pos.market_value) * weight
+                sector_values[sector] = sector_values.get(sector, 0.0) + pos_value * weight
+
+    # Direct position sector tags (pos.sector)
+    for pos in portfolio.positions:
+        if pos.sector:
+            pos_value = _convert(float(pos.market_value), pos.currency)
+            sector_values[pos.sector] = sector_values.get(pos.sector, 0.0) + pos_value
+
     return dict(sorted(sector_values.items(), key=lambda x: x[1], reverse=True))

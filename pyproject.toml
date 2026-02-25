@@ -1,13 +1,14 @@
 [project]
 name = "portfolio-analyzer"
 version = "0.1.0"
-description = "Analyze IBKR portfolio: ETF look-through, overlap, fees, concentration"
+description = "Multi-broker portfolio analyzer: ETF look-through, overlap, fees, concentration, asset classes"
 requires-python = ">=3.10"
 dependencies = [
     "ibflex>=0.15",
     "yfinance>=0.2.30",
     "rich>=13.0",
     "pandas>=2.0",
+    "openpyxl>=3.1",
     "pyyaml>=6.0",
     "python-dotenv>=1.0",
     "supabase>=2.0",
